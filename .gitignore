@@ -1,0 +1,7 @@
+__pycache__/*
+
+data/*
+legacy
+
+api_keys.json
+notes

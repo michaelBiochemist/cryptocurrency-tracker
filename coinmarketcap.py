@@ -15,7 +15,9 @@ base_url = "https://pro-api.coinmarketcap.com"
 quotes_url = f"{base_url}/v2/cryptocurrency/quotes/latest"
 ohlcv_url = f"{base_url}/v2/cryptocurrency/ohlcv/latest"
 # parameters = {"start": "1", "limit": "5000", "convert": "USD"}
-parameters = {"symbol": "BTC,ETH,BCH,XMR,SOL,MINA,ZEC"}  # , "convert": "USD"}
+parameters = {
+    "symbol": "BTC,ETH,BCH,XMR,SOL,MINA,ZEC,BNB,XRP,AGIX,CXTC"
+}  # , "convert": "USD"}
 headers = {
     "Accepts": "application/json",
     "X-CMC_PRO_API_KEY": api_key,
@@ -37,4 +39,5 @@ def fetch_api_json(url, output_file):
         print(e)
 
 
-data = fetch_api_json(quotes_url, "data/quotes.json")
+if __name__ == "__main__":
+    data = fetch_api_json(quotes_url, "data/quotes.json")

@@ -68,4 +68,4 @@ else:
         print(
             "Python-defined schema does not match database schema. Rebuilding database..."
         )
-        print(f"Db schema:\n{b.strip()}\nPython-schema:\n{create_tables.strip()}")
+        # print(f"Db schema:\n{b.strip()}\nPython-schema:\n{create_tables.strip()}")

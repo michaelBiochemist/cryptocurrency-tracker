@@ -12,7 +12,8 @@ To run:
 
 TODO:
     1. Add logging. 
-    1. Update to use .files & directories in home folder rather than data in project folder
-    1. Make list of coins to track configurable
-    1. Fix schema check in sqlite.py and enable a more sophisticated way to handle schema mismatches.
-    1. Implement reporting and alerts system. 
+    2. Update to use .files & directories in home folder rather than data in project folder
+    3. Make list of coins to track configurable
+    4. Fix schema check in sqlite.py and enable a more sophisticated way to handle schema mismatches.
+    5. Implement reporting and alerts system. 
+    6. Make into Python package and publish to Pypi

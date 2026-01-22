@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
 import sqlite3 as sql
+import logging
 
-
-cx = sql.connect("data/crypto.db")
 
 create_tables = """
 CREATE TABLE historical 
@@ -58,14 +57,24 @@ CREATE TABLE quotes
         """
 
 
-if len(cx.execute("select name from sqlite_master").fetchall()) == 0:
-    print("Database is empty and has no schema. Creating tables...")
-    cx.executescript(create_tables)
-else:
-    a = cx.execute("select sql from sqlite_master where type='table'").fetchall()
-    b = "\n".join([a[0][0], a[1][0], a[2][0]])
-    if b.strip() != create_tables.strip():
-        print(
-            "Python-defined schema does not match database schema. Rebuilding database..."
-        )
-        # print(f"Db schema:\n{b.strip()}\nPython-schema:\n{create_tables.strip()}")
+def init(config):
+    global cx
+    global logger
+    print(f"{config['data_dir']}/crypto.db")
+    cx = sql.connect(f"{config['data_dir']}/crypto.db")
+    logger = logging.getLogger("master")
+    if len(cx.execute("select name from sqlite_master").fetchall()) == 0:
+        logger.warning("Database is empty and has no schema. Creating tables...")
+        cx.executescript(create_tables)
+    else:
+        a = cx.execute("select sql from sqlite_master where type='table'").fetchall()
+        b = "\n".join([a[0][0], a[1][0], a[2][0]])
+        if b.strip() != create_tables.strip():
+            logger.warning(
+                "Python-defined schema does not match database schema. Rebuilding database..."
+            )
+            # print(f"Db schema:\n{b.strip()}\nPython-schema:\n{create_tables.strip()}")
+
+
+if __name__ == "__main__":
+    init()

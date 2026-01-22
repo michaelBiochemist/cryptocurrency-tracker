@@ -5,39 +5,61 @@
 from requests import Request, Session
 from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 import json
+import logging
 
-with open("api_keys.json") as R:
-    api_keys = json.load(R)
-api_key = api_keys["coinmarketcap"]
+logger = logging.getLogger("master")
 
 test_url = "https://sandbox-api.coinmarketcap.com"
 base_url = "https://pro-api.coinmarketcap.com"
 quotes_url = f"{base_url}/v2/cryptocurrency/quotes/latest"
 ohlcv_url = f"{base_url}/v2/cryptocurrency/ohlcv/latest"
 # parameters = {"start": "1", "limit": "5000", "convert": "USD"}
-parameters = {
-    "symbol": "BTC,ETH,BCH,XMR,SOL,MINA,ZEC,BNB,XRP,AGIX,CXTC"
-}  # , "convert": "USD"}
-headers = {
-    "Accepts": "application/json",
-    "X-CMC_PRO_API_KEY": api_key,
-}
 
-session = Session()
-session.headers.update(headers)
+
+def init(config):
+    global data_dir
+    global api_keys
+    global parameters
+    global session
+
+    data_dir = config["data_dir"]
+    api_key = config["api_keys"]["coinmarketcap"]
+    ",".join(config["symbols"])
+
+    headers = {
+        "Accepts": "application/json",
+        "X-CMC_PRO_API_KEY": api_key,
+    }
+    session = Session()
+    session.headers.update(headers)
+    parameters = {"symbol": ",".join(config["symbols"])}
 
 
 def fetch_api_json(url, output_file):
+    print(f"parameters:\n{parameters}")
+    exit()
     try:
         response = session.get(url, params=parameters)
         data = json.loads(response.text)
-        print(data)
         with open(output_file, "w") as O:
             json.dump(data, O, indent=2)
-        return data
+        if data["status"]["error_code"] == 0:
+            return data
+        else:
+            logger.error(
+                f"Querying the url: {url} failed with the following error:\n\"{data['status']['error_message']}\""
+            )
     except (ConnectionError, Timeout, TooManyRedirects) as e:
         print(e)
 
 
 if __name__ == "__main__":
+    with open("api_keys_sample.json") as R:
+        api_keys = json.load(R)
+    parameters = {
+        "symbol": "BTC,ETH,BCH,XMR,SOL,MINA,ZEC,BNB,XRP,AGIX,CXTC,PAXG,XAUT,KAG"
+    }  # , "convert": "USD"}
+
+    api_key = api_keys["coinmarketcap"]
+    logging.basicConfig(level=logging.INFO)
     data = fetch_api_json(quotes_url, "data/quotes.json")

@@ -1,0 +1,19 @@
+{
+    "data_dir": "~/.local/share/cryptotracker",
+    "api_keys": {"coinmarketcap": "Enter your coinmarketcap api key here"},
+    "symbols": [
+	    "BTC",
+		"ETH",
+		"BCH",
+		"XMR",
+		"SOL",
+		"MINA",
+		"ZEC",
+		"BNB",
+		"XRP",
+		"AGIX",
+		"CXTC",
+		"PAXG",
+		"XAUT",
+		"KAG"]
+}

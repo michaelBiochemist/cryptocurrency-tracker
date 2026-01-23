@@ -6,3 +6,5 @@ legacy
 
 api_keys.json
 notes
+
+.DS_Store

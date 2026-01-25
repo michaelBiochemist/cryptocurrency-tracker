@@ -36,8 +36,6 @@ def init(config):
 
 
 def fetch_api_json(url, output_file):
-    print(f"parameters:\n{parameters}")
-    exit()
     try:
         response = session.get(url, params=parameters)
         data = json.loads(response.text)

@@ -69,20 +69,19 @@ def load_historic(args: argparse.Namespace):
         liney_remainder = ",".join(liney[2:])
         inserts += f'("{symbol}","{liney[0]}","{liney[1]}",{liney_remainder}),'
 
-    sql.cx.execute(
-        """
+    sql.cx.execute("""
     Insert into historical
     (Symbol, StartDate, EndDate, Open, High, Low, Close, Volume, Market_Cap)
     Values
-    """
-        + inserts[:-1]
-    )
+    """ + inserts[:-1])
     sql.cx.commit()
     print("file uploaded successfully")
 
 
 def fetch_and_insert_latest_quotes(args: argparse.Namespace):
-    data = ccap.fetch_api_json(ccap.quotes_url, "data/quotes_latest.json")
+    data = ccap.fetch_api_json(
+        ccap.quotes_url, f"{config['data_dir']}/quotes_latest.json"
+    )
     for key in data["data"].keys():
         for a in data["data"][key]:
             insert_string = f"""
@@ -98,6 +97,7 @@ def fetch_and_insert_latest_quotes(args: argparse.Namespace):
 
 
 def init(args: argparse.Namespace):
+    global config
     path = pathlib.Path(args.config_directory).expanduser()
     if not path.exists():
         logger.info(f"Path {path}. does not currently exist. Creating it...")
@@ -121,9 +121,9 @@ def init(args: argparse.Namespace):
         exit()
     with open(config_path) as R:
         config = json.load(R)
-    data_path = pathlib.Path(config["data_dir"]).expanduser()
-    if not data_path.exists():
-        data_path.mkdir(parents=True)
+    config["data_dir"] = pathlib.Path(config["data_dir"]).expanduser()
+    if not config["data_dir"].exists():
+        config["data_dir"].mkdir(parents=True)
     ccap.init(config)
     sql.init(config)
 

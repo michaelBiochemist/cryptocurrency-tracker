@@ -1,0 +1,50 @@
+name: test
+on:
+  push:
+    tags: ['test']
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Branch
+        uses: actions/checkout@v4
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Update pip
+        run: |
+          pip install --upgrade pip
+      - name: Run pre-commit
+        run: |
+          pip install pre-commit
+          pre-commit run --all
+
+  publish:
+    name: Build and Publish
+    needs: lint
+    runs-on: ubuntu-latest
+    environment:
+      name: test
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Update pip
+        run: pip install --upgrade pip
+      - name: Build distribution
+        run: |
+          pip install build
+          python -m build
+      - name: Upload to PyPI
+        env:
+          TWINE_REPOSITORY: ${{ vars.TWINE_REPOSITORY }}
+          TWINE_USERNAME: ${{ vars.TWINE_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+        run: |
+          pip install twine
+          twine upload dist/* --verbose

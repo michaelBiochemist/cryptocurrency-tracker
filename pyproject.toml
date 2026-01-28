@@ -1,0 +1,41 @@
+[build-system]
+requires = ["flit_core==3.12.0"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "cryptomonere"
+version = '0.0.0'
+dependencies = [
+    "requests",
+]
+authors = [
+	{name="Michael van Dyk",email="mvandyk@protonmail.com"}
+]
+requires-python = ">=3.12"
+
+[project.scripts]
+run = "cryptomonere.app:run"
+noaapi = "crytpomonere.app:run"
+
+[project.optional-dependencies]
+    dev = ["black",
+    "build",
+    "flake8",
+    "isort",
+    "pre-commit",
+    "twine",
+    ]
+    reports = ["matplotlib",
+    "pandas"
+    ]
+[tool.black]
+line-length = 160
+target-version = ['py312']
+
+[tool.isort]
+append_only = true
+line_length = 160
+combine_as_imports = true
+skip = ["build", ".tox", "venv"]
+skip_glob = ["*.pya"]
+profile = "black"

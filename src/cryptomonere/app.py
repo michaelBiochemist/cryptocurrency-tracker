@@ -7,6 +7,7 @@ import logging, logging.config
 import json
 import pathlib
 import shutil
+import sys
 
 logger = logging.getLogger("master")
 """
@@ -21,7 +22,7 @@ Log levels:
 config_directory = f"{pathlib.Path.home()}/.config/cryptotracker"
 
 
-def parse_args():
+def parse_args(args_raw):
     parser = argparse.ArgumentParser(description="Cryptocurrency Price Tracker")
     parser.add_argument(
         "-L",
@@ -53,7 +54,7 @@ def parse_args():
     parser_boop = subparsers.add_parser("init")
     parser_boop.set_defaults(func=boop)
 
-    args = parser.parse_args()
+    args = parser.parse_args(args_raw)
     return args
 
 
@@ -79,9 +80,7 @@ def load_historic(args: argparse.Namespace):
 
 
 def fetch_and_insert_latest_quotes(args: argparse.Namespace):
-    data = ccap.fetch_api_json(
-        ccap.quotes_url, f"{config['data_dir']}/quotes_latest.json"
-    )
+    data = ccap.fetch_api_json(ccap.quotes_url, f"{config['data_dir']}/quotes_latest.json")
     for key in data["data"].keys():
         for a in data["data"][key]:
             insert_string = f"""
@@ -104,20 +103,14 @@ def init(args: argparse.Namespace):
         try:
             path.mkdir(parents=True)
         except Exception as e:
-            logger.error(
-                f"Path {path} cannot be created due to an exception:\n{e}\nPlease run again with a usable path (or allow the default to be created)"
-            )
+            logger.error(f"Path {path} cannot be created due to an exception:\n{e}\nPlease run again with a usable path (or allow the default to be created)")
             exit()
 
     config_path = path.joinpath("config.json")
     if not config_path.exists():
         logger.info("Config file does not exist. Creating default config file.")
-        shutil.copy(
-            pathlib.Path(__file__).parent.joinpath("config_default.json"), config_path
-        )
-        logger.info(
-            f"Config file has been created at {config_path}.\nPlease open your config file and update your api key."
-        )
+        shutil.copy(pathlib.Path(__file__).parent.joinpath("config_default.json"), config_path)
+        logger.info(f"Config file has been created at {config_path}.\nPlease open your config file and update your api key.")
         exit()
     with open(config_path) as R:
         config = json.load(R)
@@ -128,17 +121,17 @@ def init(args: argparse.Namespace):
     sql.init(config)
 
 
-def boop(args: argparse.Namespace):
-    pass
-
-
-def main():
+def main(args_raw):
     # logging.config.dictConfig(config=logging_config)
-    args = parse_args()
+    args = parse_args(args_raw)
     logging.basicConfig(level=args.log_level)
     init(args)
     args.func(args)
 
 
+def run():
+    main(sys.argv[1:])
+
+
 if __name__ == "__main__":
-    main()
+    run()

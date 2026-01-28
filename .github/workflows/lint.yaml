@@ -1,0 +1,23 @@
+name: lint
+on:
+  pull_request:
+    branches: ['master']
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Branch
+        uses: actions/checkout@v4
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Update pip
+        run: |
+          pip install --upgrade pip
+      - name: Run pre-commit
+        run: |
+          pip install pre-commit
+          pre-commit run --all

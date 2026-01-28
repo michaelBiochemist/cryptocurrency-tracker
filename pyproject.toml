@@ -12,6 +12,7 @@ authors = [
 	{name="Michael van Dyk",email="mvandyk@protonmail.com"}
 ]
 requires-python = ">=3.12"
+description = "Terminal based cryptocurrency tracker with alerts and reporting systems"
 
 [project.scripts]
 run = "cryptomonere.app:run"

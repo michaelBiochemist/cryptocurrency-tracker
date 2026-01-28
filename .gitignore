@@ -1,6 +1,6 @@
 __pycache__/*
 
-.python_version
+.python-version
 data/*
 logs/*
 legacy

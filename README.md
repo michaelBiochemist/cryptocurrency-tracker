@@ -9,11 +9,4 @@ To run:
     - mkdir "data/" in core project directory (apologies that's a part of my gitignore file right now)
     - go to coinmarketcap.com and get an api key. Update the api_keys_sample.json file with the correct api key and rename the file as "api_keys.json"
 
-
-TODO:
-    1. Add logging. 
-    2. Update to use .files & directories in home folder rather than data in project folder
-    3. Make list of coins to track configurable
-    4. Fix schema check in sqlite.py and enable a more sophisticated way to handle schema mismatches.
-    5. Implement reporting and alerts system. 
-    6. Make into Python package and publish to Pypi
+(Todo moved to youtrack instance. Will update readme after PyPi packaging)

@@ -1,0 +1,10 @@
+{
+    "range-rules": [
+        {"currency": "XMR", "low":400, "high":600},
+        {"currency": "MINA", "low":0.0001, "high": 1.0}
+    ],
+    "variability-rules": [
+        {"currency":"All", "magnitude": 0.6, "duration": "1 week"},
+        {"currency":"All", "magnitude": 0.3, "duration": "1 week"}
+    ]
+}

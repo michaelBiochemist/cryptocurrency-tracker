@@ -13,6 +13,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 description = "Terminal based cryptocurrency tracker with alerts and reporting systems"
+license = { file = "LICENSE.txt" }
 
 [project.scripts]
 monere = "cryptomonere.app:run"

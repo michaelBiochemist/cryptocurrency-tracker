@@ -26,7 +26,7 @@ jobs:
     needs: lint
     runs-on: ubuntu-latest
     environment:
-      name: prod
+      name: Release
     steps:
       - name: Checkout branch
         uses: actions/checkout@v4
@@ -42,8 +42,7 @@ jobs:
           flit build --format "wheel"
       - name: Upload to PyPI
         env:
-          TWINE_USERNAME: ${{ vars.TWINE_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+          FLIT_USERNAME: ${{ vars.PYPI }}
+          FLIT_PASSWORD: ${{ secrets.PYPI }}
         run: |
-          pip install twine
-          twine upload dist/* --verbose
+          flit publish

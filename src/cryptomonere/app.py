@@ -8,8 +8,7 @@ import pathlib
 import shutil
 import sys
 
-import coinmarketcap as ccap
-import sqlite as sql
+from . import coinmarketcap as ccap, sqlite as sql
 
 logger = logging.getLogger("master")
 """

@@ -1,9 +1,8 @@
 __pycache__/*
 
 .python-version
+dist/*
 data/*
 logs/*
 legacy
-
-api_keys.json
 notes

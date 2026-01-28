@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
-import sqlite as sql
-import coinmarketcap as ccap
 import logging
+
+import coinmarketcap as ccap
+import sqlite as sql
 
 logger = logging.getLogger("defaultLogger")
 

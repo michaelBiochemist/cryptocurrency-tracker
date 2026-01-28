@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 
-import sqlite3 as sql
 import logging
-
+import sqlite3 as sql
 
 create_tables = """
-CREATE TABLE historical 
+CREATE TABLE historical
         (
             Symbol varchar(6),
             StartDate Date,
@@ -70,9 +69,7 @@ def init(config):
         a = cx.execute("select sql from sqlite_master where type='table'").fetchall()
         b = "\n".join([a[0][0], a[1][0], a[2][0]])
         if b.strip() != create_tables.strip():
-            logger.warning(
-                "Python-defined schema does not match database schema. Rebuilding database..."
-            )
+            logger.warning("Python-defined schema does not match database schema. Rebuilding database...")
             # print(f"Db schema:\n{b.strip()}\nPython-schema:\n{create_tables.strip()}")
 
 

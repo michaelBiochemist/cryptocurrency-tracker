@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 
 import argparse
-import sqlite as sql
-import coinmarketcap as ccap
-import logging, logging.config
 import json
+import logging
+import logging.config
 import pathlib
 import shutil
 import sys
+
+import coinmarketcap as ccap
+import sqlite as sql
 
 logger = logging.getLogger("master")
 """
@@ -51,9 +53,6 @@ def parse_args(args_raw):
     parser_get = subparsers.add_parser("get", help="Get latest quotes")
     parser_get.set_defaults(func=fetch_and_insert_latest_quotes)
 
-    parser_boop = subparsers.add_parser("init")
-    parser_boop.set_defaults(func=boop)
-
     args = parser.parse_args(args_raw)
     return args
 
@@ -70,11 +69,14 @@ def load_historic(args: argparse.Namespace):
         liney_remainder = ",".join(liney[2:])
         inserts += f'("{symbol}","{liney[0]}","{liney[1]}",{liney_remainder}),'
 
-    sql.cx.execute("""
+    sql.cx.execute(
+        """
     Insert into historical
     (Symbol, StartDate, EndDate, Open, High, Low, Close, Volume, Market_Cap)
     Values
-    """ + inserts[:-1])
+    """
+        + inserts[:-1]
+    )
     sql.cx.commit()
     print("file uploaded successfully")
 

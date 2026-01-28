@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
 
-# Documentation at https://coinmarketcap.com/api/documentation/v1/#section/Endpoint-Overview
-from requests import Request, Session
-from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 import json
 import logging
+
+# Documentation at https://coinmarketcap.com/api/documentation/v1/#section/Endpoint-Overview
+from requests import Session
+from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 
 logger = logging.getLogger("master")
 
@@ -17,12 +18,9 @@ ohlcv_url = f"{base_url}/v2/cryptocurrency/ohlcv/latest"
 
 
 def init(config):
-    global data_dir
-    global api_keys
     global parameters
     global session
 
-    data_dir = config["data_dir"]
     api_key = config["api_keys"]["coinmarketcap"]
     ",".join(config["symbols"])
 
@@ -39,25 +37,11 @@ def fetch_api_json(url, output_file):
     try:
         response = session.get(url, params=parameters)
         data = json.loads(response.text)
-        with open(output_file, "w") as O:
-            json.dump(data, O, indent=2)
+        with open(output_file, "w") as OutFile:
+            json.dump(data, OutFile, indent=2)
         if data["status"]["error_code"] == 0:
             return data
         else:
-            logger.error(
-                f"Querying the url: {url} failed with the following error:\n\"{data['status']['error_message']}\""
-            )
+            logger.error(f"Querying the url: {url} failed with the following error:\n\"{data['status']['error_message']}\"")
     except (ConnectionError, Timeout, TooManyRedirects) as e:
         print(e)
-
-
-if __name__ == "__main__":
-    with open("api_keys_sample.json") as R:
-        api_keys = json.load(R)
-    parameters = {
-        "symbol": "BTC,ETH,BCH,XMR,SOL,MINA,ZEC,BNB,XRP,AGIX,CXTC,PAXG,XAUT,KAG"
-    }  # , "convert": "USD"}
-
-    api_key = api_keys["coinmarketcap"]
-    logging.basicConfig(level=logging.INFO)
-    data = fetch_api_json(quotes_url, "data/quotes.json")

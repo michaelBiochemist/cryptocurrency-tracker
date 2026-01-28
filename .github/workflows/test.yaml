@@ -38,8 +38,8 @@ jobs:
         run: pip install --upgrade pip
       - name: Build distribution
         run: |
-          pip install build
-          python -m build
+          pip install flit
+          flit build --format wheel
       - name: Upload to PyPI
         env:
           TWINE_REPOSITORY: ${{ vars.TWINE_REPOSITORY }}

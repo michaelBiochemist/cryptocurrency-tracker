@@ -8,9 +8,11 @@ import pathlib
 import shutil
 import sys
 
-from . import coinmarketcap as ccap, sqlite as sql
+# from . import coinmarketcap as ccap, sqlite as sql
+from cryptomonere import coinmarketcap as ccap, sqlite as sql
+from cryptomonere.SqlHandler import SqlHandler
 
-logger = logging.getLogger("master")
+logger = logging.getLogger("monere")
 """
 Log levels:
     ERROR
@@ -51,6 +53,15 @@ def parse_args(args_raw):
     parser_load.add_argument("filename", help="Name of file")
     parser_get = subparsers.add_parser("get", help="Get latest quotes")
     parser_get.set_defaults(func=fetch_and_insert_latest_quotes)
+    parser_get.add_argument("-N", "--no-upload", default=False)
+
+    parser_map = subparsers.add_parser("map", help="Get mapping of CoinmarketCap Ids to All listed cryptocurrencies")
+    parser_map.set_defaults(func=fetch_map)
+    parser_map.add_argument("-N", "--no-upload", default=False)
+
+    parser_search = subparsers.add_parser("search", help="Query Cryptocurrency Mappings")
+    parser_search.set_defaults(func=query_map)
+    parser_search.add_argument("search_query")
 
     args = parser.parse_args(args_raw)
     return args
@@ -80,8 +91,81 @@ def load_historic(args: argparse.Namespace):
     print("file uploaded successfully")
 
 
+def fetch_map(args: argparse.Namespace):
+    data = ccap.fetch_api_json(ccap.map_url, f"{config['data_dir']}/map.json")
+    if args.no_upload:
+        return 0
+    recreate_cryptocurrency_map = """
+    Drop table if exists cryptocurrency_map;
+    Create table cryptocurrency_map (
+    id int unique,
+    currency_rank int,
+    name varchar(50),
+    symbol varchar(10),
+    slug varchar(50),
+    is_active tinyint,
+    status tinyint,
+    first_historical_data datetime,
+    last_historical_data datetime,
+    platform_id int,
+    platform_name varchar(50),
+    platform_symbol varchar(10),
+    platform_slug varchar(50)
+    );
+    """
+    logger.debug(recreate_cryptocurrency_map)
+    sql.cx.executescript(recreate_cryptocurrency_map)
+    for row in data["data"]:
+        platform_query = "NULL, NULL, NULL, NULL"
+        if row["platform"] is not None:
+            platform_query = f"{row['platform']['id']}, \"{row['platform']['name']}\", \"{row['platform']['symbol']}\", \"{row['platform']['slug']}\""
+
+        insert_string = f"""
+insert into cryptocurrency_map (
+    id,
+    currency_rank,
+    name,
+    symbol,
+    slug,
+    is_active,
+    status,
+    first_historical_data,
+    last_historical_data,
+    platform_id,
+    platform_name,
+    platform_symbol,
+    platform_slug
+) VALUES ({row['id']}, {row['rank']}, \"{row['name'].strip("\"")}\", \"{row['symbol']}\", \"{row['slug']}\", {row['is_active']}, {row['status']}, \"{row['first_historical_data']}\", \"{row['last_historical_data']}\", {platform_query});
+        """.replace(
+            "None", "NULL"
+        )
+        logger.debug(insert_string)
+        sql.cx.execute(insert_string)
+        sql.cx.commit()
+
+
+def query_map(args: argparse.Namespace):
+    SQL = SqlHandler(config)
+    if "cryptocurrency_map" not in SQL.table_list:
+        logger.info("Table cryptocurrency_map does not exist. This data will take a minute to fetch and upload...")
+        fetch_map(args)
+    headers = ["Id", "Symbol", "Name", "slug"]
+    print(f"{str(headers[0]).ljust(6)};  {headers[1].ljust(10)}{headers[2].ljust(30)};{headers[3].ljust(30)}")
+    SQL.sql(
+        f"""
+    Select Id, Symbol, Name, slug from cryptocurrency_map where
+        (symbol like \"%{args.search_query}%\")
+        OR (Name like \"%{args.search_query}%\")
+        OR (slug like \"%{args.search_query}%\")
+    """,
+        row_factory=lambda Cursor, Row: print(f"{str(Row[0]).ljust(6)};  {Row[1].ljust(10)}{Row[2].ljust(30)};{Row[3].ljust(30)}"),
+    )
+
+
 def fetch_and_insert_latest_quotes(args: argparse.Namespace):
-    data = ccap.fetch_api_json(ccap.quotes_url, f"{config['data_dir']}/quotes_latest.json")
+    data = ccap.fetch_api_json(ccap.quotes_url, f"{config['data_dir']}/quotes_latest.json", parameters={"symbol": ",".join(config["symbols"])})
+    if args.no_upload:
+        return 0
     for key in data["data"].keys():
         for a in data["data"][key]:
             insert_string = f"""

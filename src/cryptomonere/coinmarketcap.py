@@ -8,17 +8,17 @@ import logging
 from requests import Session
 from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 
-logger = logging.getLogger("master")
+logger = logging.getLogger(__name__)
 
 test_url = "https://sandbox-api.coinmarketcap.com"
 base_url = "https://pro-api.coinmarketcap.com"
 quotes_url = f"{base_url}/v2/cryptocurrency/quotes/latest"
+map_url = f"{base_url}/v1/cryptocurrency/map"
 ohlcv_url = f"{base_url}/v2/cryptocurrency/ohlcv/latest"
 # parameters = {"start": "1", "limit": "5000", "convert": "USD"}
 
 
 def init(config):
-    global parameters
     global session
 
     api_key = config["api_keys"]["coinmarketcap"]
@@ -30,13 +30,14 @@ def init(config):
     }
     session = Session()
     session.headers.update(headers)
-    parameters = {"symbol": ",".join(config["symbols"])}
+    # parameters = {"slug": ",".join(config["names"]).lower().strip()}
 
 
-def fetch_api_json(url, output_file):
+def fetch_api_json(url, output_file, parameters={}):
     try:
         response = session.get(url, params=parameters)
         data = json.loads(response.text)
+        print(data)
         with open(output_file, "w") as OutFile:
             json.dump(data, OutFile, indent=2)
         if data["status"]["error_code"] == 0:

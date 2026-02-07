@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 
 import logging
-import sqlite3 as sql
+import sqlite3 as sqlite
+from itertools import chain
+from typing import List
 
+logger = logging.getLogger(__name__)
 create_tables = """
 CREATE TABLE historical
         (
@@ -21,7 +24,6 @@ CREATE TABLE currencies
             name varchar(50),
             symbol varchar(6),
             date_added datetime
-
         );
 CREATE TABLE quotes
         (
@@ -56,15 +58,28 @@ CREATE TABLE quotes
         """
 
 
-def init(config):
-    global cx
-    global logger
-    cx = sql.connect(f"{config['data_dir']}/crypto.db")
-    logger = logging.getLogger("master")
-    if len(cx.execute("select name from sqlite_master").fetchall()) == 0:
-        logger.warning("Database is empty and has no schema. Creating tables...")
-        cx.executescript(create_tables)
+class SqlHandler:
+    cx: sqlite.Connection
+    table_list = List[str]
 
+    def listQuery(self, query):
+        self.cx.row_factory = None
+        a = self.cx.execute(query).fetchall()
+        return list(chain(*a))
 
-if __name__ == "__main__":
-    init()
+    def sql(self, query, row_factory=None, is_update=False):
+        self.cx.row_factory = row_factory
+        logger.debug(query)
+        temp = self.cx.execute(query)
+        if is_update:
+            self.cx.commit()
+        else:
+            return temp.fetchall()
+
+    def __init__(self, config):
+        self.cx = sqlite.connect(f"{config['data_dir']}/crypto.db")
+        self.table_list = self.listQuery("select name from sqlite_master where type='table'")
+        if len(self.table_list) == 0:
+            logger.warning("Database is empty and has no schema. Creating tables...")
+            self.cx.executescript(create_tables)
+            self.table_list = self.listQuery("select name from sqlite_master where type='table'")

@@ -88,7 +88,7 @@ def load_historic(args: argparse.Namespace):
         + inserts[:-1]
     )
     sql.cx.commit()
-    print("file uploaded successfully")
+    logger.info("file uploaded successfully")
 
 
 def fetch_map(args: argparse.Namespace):
@@ -143,41 +143,114 @@ insert into cryptocurrency_map (
         sql.cx.execute(insert_string)
         sql.cx.commit()
 
+        sql.sql_file("dedupe_cryptocurrency_map.sql")
+
 
 def query_map(args: argparse.Namespace):
     SQL = SqlHandler(config)
     if "cryptocurrency_map" not in SQL.table_list:
         logger.info("Table cryptocurrency_map does not exist. This data will take a minute to fetch and upload...")
         fetch_map(args)
-    headers = ["Id", "Symbol", "Name", "slug"]
-    print(f"{str(headers[0]).ljust(6)};  {headers[1].ljust(10)}{headers[2].ljust(30)};{headers[3].ljust(30)}")
+    headers = ["Cap_Id", "Symbol", "Name", "slug", "rank"]
+    print(f"{headers[0].ljust(6)} {headers[4].ljust(6)}  {headers[1].ljust(10)}{headers[2].ljust(30)};{headers[3].ljust(30)}")
     SQL.sql(
         f"""
-    Select Id, Symbol, Name, slug from cryptocurrency_map where
+    Select Id, Symbol, Name, slug, currency_rank from currencywhere
         (symbol like \"%{args.search_query}%\")
         OR (Name like \"%{args.search_query}%\")
         OR (slug like \"%{args.search_query}%\")
     """,
-        row_factory=lambda Cursor, Row: print(f"{str(Row[0]).ljust(6)};  {Row[1].ljust(10)}{Row[2].ljust(30)};{Row[3].ljust(30)}"),
+        row_factory=lambda Cursor, Row: print(f"{str(Row[0]).ljust(6)} {str(Row[4]).ljust(6)}  {Row[1].ljust(10)}{Row[2].ljust(30)};{Row[3].ljust(30)}"),
     )
 
 
 def fetch_and_insert_latest_quotes(args: argparse.Namespace):
-    data = ccap.fetch_api_json(ccap.quotes_url, f"{config['data_dir']}/quotes_latest.json", parameters={"symbol": ",".join(config["symbols"])})
+    # Set parameters in decreasing order of specificity, from coinmarketcap_id, to slug, to symbol
+    if "symbols" not in config.keys():
+        logging.warn(
+            "There is no list of cryptocurrency symbols in your config file, and thus nothing to query. Please update your config file if you want this command to work."
+        )
+        return 1
+    SQL = SqlHandler(config)
+    symbol_list = '","'.join(config["symbols"])
+    id_list = SQL.listQuery(
+        f"""
+    Select Id from currency
+    where symbol in (\"{symbol_list}\")
+    """
+    )
+
+    parameters = {"id": ",".join([str(cmc_id) for cmc_id in id_list])}
+
+    data = ccap.fetch_api_json(ccap.quotes_url, f"{config['data_dir']}/quotes_latest.json", parameters=parameters)
     if args.no_upload:
         return 0
-    for key in data["data"].keys():
-        for a in data["data"][key]:
-            insert_string = f"""
-    insert into quotes
-    (id, name, symbol, date_added, max_supply, circulating_supply, is_active, infinite_supply, minted_market_cap, cmc_rank, is_fiat, self_reported_circulating_supply, self_reported_market_cap, last_updated, price, volume_24h, volume_change_24h, percent_change_1h, percent_change_24h, percent_change_7d, percent_change_30d, percent_change_60d, percent_change_90d, market_cap, market_cap_dominance, fully_diluted_market_cap)
+    insert_string = """
+    insert into quote
+    (id,
+     name,
+     symbol,
+     date_added,
+     max_supply,
+     circulating_supply,
+     is_active,
+     infinite_supply,
+     minted_market_cap,
+     cmc_rank,
+     is_fiat,
+     self_reported_circulating_supply,
+     self_reported_market_cap,
+     last_updated,
+     price,
+     volume_24h,
+     volume_change_24h,
+     percent_change_1h,
+     percent_change_24h,
+     percent_change_7d,
+     percent_change_30d,
+     percent_change_60d,
+     percent_change_90d,
+     market_cap,
+     market_cap_dominance,
+     fully_diluted_market_cap)
     VALUES
-        ({a['id']}, \"{a['name']}\", \"{a['symbol']}\", \"{a['date_added']}\", {a['max_supply']}, {a['circulating_supply']}, {a['is_active']}, {a['infinite_supply']}, {a['minted_market_cap']}, {a['cmc_rank']}, {a['is_fiat']}, {a['self_reported_circulating_supply']}, {a['self_reported_market_cap']}, \"{a['last_updated']}\", {a['quote']['USD']['price']}, {a['quote']['USD']['volume_24h']}, {a['quote']['USD']['volume_change_24h']}, {a['quote']['USD']['percent_change_1h']}, {a['quote']['USD']['percent_change_24h']}, {a['quote']['USD']['percent_change_7d']}, {a['quote']['USD']['percent_change_30d']}, {a['quote']['USD']['percent_change_60d']}, {a['quote']['USD']['percent_change_90d']}, {a['quote']['USD']['market_cap']}, {a['quote']['USD']['market_cap_dominance']}, {a['quote']['USD']['fully_diluted_market_cap']})\n""".replace(
+    """
+
+    values_strings = []
+    for key in data["data"].keys():
+        a = data["data"][key]
+        values_strings.append(
+            f"""
+     ({a['id']},
+     \"{a['name']}\",
+     \"{a['symbol']}\",
+     \"{a['date_added']}\",
+     {a['max_supply']},
+     {a['circulating_supply']},
+     {a['is_active']},
+     {a['infinite_supply']},
+     {a['minted_market_cap']},
+     {a['cmc_rank']},
+     {a['is_fiat']},
+     {a['self_reported_circulating_supply']},
+     {a['self_reported_market_cap']},
+     \"{a['last_updated']}\",
+     {a['quote']['USD']['price']},
+     {a['quote']['USD']['volume_24h']},
+     {a['quote']['USD']['volume_change_24h']},
+     {a['quote']['USD']['percent_change_1h']},
+     {a['quote']['USD']['percent_change_24h']},
+     {a['quote']['USD']['percent_change_7d']},
+     {a['quote']['USD']['percent_change_30d']},
+     {a['quote']['USD']['percent_change_60d']},
+     {a['quote']['USD']['percent_change_90d']},
+     {a['quote']['USD']['market_cap']},
+     {a['quote']['USD']['market_cap_dominance']},
+     {a['quote']['USD']['fully_diluted_market_cap']})\n""".replace(
                 "None", "NULL"
             )
-            logger.debug(insert_string)
-            sql.cx.execute(insert_string)
-            sql.cx.commit()
+        )
+    SQL.bulk_insert(insert_string, values_strings)
 
 
 def init(args: argparse.Namespace):
@@ -203,7 +276,10 @@ def init(args: argparse.Namespace):
     if not config["data_dir"].exists():
         config["data_dir"].mkdir(parents=True)
     ccap.init(config)
-    sql.init(config)
+    SQL = SqlHandler(config)
+    if "currency" not in SQL.table_list:
+        logger.info("currency table (table listing all supported cryptocurrencies) does not exist. Creating it... (this may take a minute)")
+        fetch_map(args)
 
 
 def main(args_raw):

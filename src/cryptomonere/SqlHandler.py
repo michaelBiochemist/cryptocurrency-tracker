@@ -7,7 +7,7 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 create_tables = """
-CREATE TABLE historical
+CREATE TABLE history
         (
             Symbol varchar(6),
             StartDate Date,
@@ -19,13 +19,7 @@ CREATE TABLE historical
             Volume Real,
             Market_Cap Real
         );
-CREATE TABLE currencies
-        (
-            name varchar(50),
-            symbol varchar(6),
-            date_added datetime
-        );
-CREATE TABLE quotes
+CREATE TABLE quote
         (
             id int,
             timestamp datetime,
@@ -66,6 +60,23 @@ class SqlHandler:
         self.cx.row_factory = None
         a = self.cx.execute(query).fetchall()
         return list(chain(*a))
+
+    def bulk_insert(self, insert_into, values):
+        if logger.getEffectiveLevel() == logging.DEBUG:
+            for value in values:
+                self.sql(f"{insert_into}\n{value};", is_update=True)
+
+        else:
+            self.sql(insert_into + "\n" + ",".join(values) + ";", is_update=True)
+
+    def sql_file(self, filename, row_factory=None):
+        self.cx.row_factory = row_factory
+        with open("sql/" + filename) as SQLFILE:
+            query = SQLFILE.read()
+        logger.debug(query)
+        temp = self.cx.executescript(query)
+        if row_factory is not None:
+            return temp.fetchall()
 
     def sql(self, query, row_factory=None, is_update=False):
         self.cx.row_factory = row_factory

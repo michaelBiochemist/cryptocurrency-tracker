@@ -37,7 +37,7 @@ def fetch_api_json(url, output_file, parameters={}):
     try:
         response = session.get(url, params=parameters)
         data = json.loads(response.text)
-        print(data)
+        # print(data)
         with open(output_file, "w") as OutFile:
             json.dump(data, OutFile, indent=2)
         if data["status"]["error_code"] == 0:

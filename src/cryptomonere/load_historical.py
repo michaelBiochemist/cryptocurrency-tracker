@@ -18,7 +18,7 @@ def load_historical(fname, symbol):
 
     sql.cx.execute(
         """
-    Insert into historical
+    Insert into history
     (Symbol, StartDate, EndDate, Open, High, Low, Close, Volume, Market_Cap)
     Values
     """

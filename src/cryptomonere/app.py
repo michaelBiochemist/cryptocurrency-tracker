@@ -7,9 +7,11 @@ import logging.config
 import pathlib
 import shutil
 import sys
+from datetime import datetime, timezone
 
 # from . import coinmarketcap as ccap, sqlite as sql
 from cryptomonere import coinmarketcap as ccap, sqlite as sql
+from cryptomonere.alerts_json import AlertRules
 from cryptomonere.SqlHandler import SqlHandler
 
 logger = logging.getLogger("monere")
@@ -54,6 +56,7 @@ def parse_args(args_raw):
     parser_get = subparsers.add_parser("get", help="Get latest quotes")
     parser_get.set_defaults(func=fetch_and_insert_latest_quotes)
     parser_get.add_argument("-N", "--no-upload", default=False)
+    parser_get.add_argument("-n", "--no-update-alert", default=False)
 
     parser_map = subparsers.add_parser("map", help="Get mapping of CoinmarketCap Ids to All listed cryptocurrencies")
     parser_map.set_defaults(func=fetch_map)
@@ -62,6 +65,9 @@ def parse_args(args_raw):
     parser_search = subparsers.add_parser("search", help="Query Cryptocurrency Mappings")
     parser_search.set_defaults(func=query_map)
     parser_search.add_argument("search_query")
+
+    parser_search = subparsers.add_parser("alert", help="Check alerts")
+    parser_search.set_defaults(func=alert)
 
     args = parser.parse_args(args_raw)
     return args
@@ -155,8 +161,8 @@ def query_map(args: argparse.Namespace):
     print(f"{headers[0].ljust(6)} {headers[4].ljust(6)}  {headers[1].ljust(10)}{headers[2].ljust(30)};{headers[3].ljust(30)}")
     SQL.sql(
         f"""
-    Select Id, Symbol, Name, slug, currency_rank from currencywhere
-        (symbol like \"%{args.search_query}%\")
+    Select Id, Symbol, Name, slug, currency_rank from currency
+    WHERE (symbol like \"%{args.search_query}%\")
         OR (Name like \"%{args.search_query}%\")
         OR (slug like \"%{args.search_query}%\")
     """,
@@ -181,7 +187,7 @@ def fetch_and_insert_latest_quotes(args: argparse.Namespace):
     )
 
     parameters = {"id": ",".join([str(cmc_id) for cmc_id in id_list])}
-
+    timestamp = datetime.now(timezone.utc).isoformat()
     data = ccap.fetch_api_json(ccap.quotes_url, f"{config['data_dir']}/quotes_latest.json", parameters=parameters)
     if args.no_upload:
         return 0
@@ -190,6 +196,7 @@ def fetch_and_insert_latest_quotes(args: argparse.Namespace):
     (id,
      name,
      symbol,
+     timestamp,
      date_added,
      max_supply,
      circulating_supply,
@@ -224,6 +231,7 @@ def fetch_and_insert_latest_quotes(args: argparse.Namespace):
      ({a['id']},
      \"{a['name']}\",
      \"{a['symbol']}\",
+     \"{timestamp}\",
      \"{a['date_added']}\",
      {a['max_supply']},
      {a['circulating_supply']},
@@ -251,6 +259,16 @@ def fetch_and_insert_latest_quotes(args: argparse.Namespace):
             )
         )
     SQL.bulk_insert(insert_string, values_strings)
+    SQL.sql_file("quote_to_quote_latest.sql")
+
+    if not args.no_update_alert:
+        alert(args)
+
+
+def alert(args: argparse.Namespace):
+    ar = AlertRules(pathlib.Path(args.config_directory).expanduser().joinpath("alert_rules.json"))
+    SQL = SqlHandler(config)
+    SQL.sql(ar.range_rules_to_sql(), row_factory=lambda Cursor, Row: print(f"{Row[0]} {Row[2]} {Row[1]}"))
 
 
 def init(args: argparse.Namespace):
@@ -268,7 +286,12 @@ def init(args: argparse.Namespace):
     if not config_path.exists():
         logger.info("Config file does not exist. Creating default config file.")
         shutil.copy(pathlib.Path(__file__).parent.joinpath("config_default.json"), config_path)
-        logger.info(f"Config file has been created at {config_path}.\nPlease open your config file and update your api key.")
+        shutil.copy(pathlib.Path(__file__).parent.joinpath("alerts_sample.json"), config_path.parent.joinpath("alert_rules.json"))
+        logger.info(
+            f"""Config file has been created at {config_path}.\n
+        Please open your config file and update your api key.
+        Please Also update your alert_rules.json file to get correct alerts"""
+        )
         exit()
     with open(config_path) as R:
         config = json.load(R)

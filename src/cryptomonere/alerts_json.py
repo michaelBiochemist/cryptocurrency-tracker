@@ -5,6 +5,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
+# from functools import reduce
+
 
 class RangeRule(BaseModel):
     currency: str
@@ -15,6 +17,9 @@ class RangeRule(BaseModel):
         self.currency = a_dict["currency"]
         self.low = a_dict["low"]
         self.high = a_dict["high"]
+
+    def to_sql(self):
+        return f'(symbol="{self.currency}" and price not between {self.low} AND {self.high})'
 
 
 class VariabilityRule(BaseModel):
@@ -41,6 +46,19 @@ class AlertRules(BaseModel):
     range_rules: List[RangeRule] = []
     variability_rules: List[VariabilityRule] = []
 
+    def __init__(self, fname):
+        super().__init__()
+        with open(fname, "r") as TEMPREAD:
+            input_json = json.load(TEMPREAD)
+        if len(input_json["range-rules"]) != 0:
+            for rule in input_json["range-rules"]:
+                new_rule = RangeRule(currency=rule["currency"], low=rule["low"], high=rule["high"])
+                self.range_rules.append(new_rule)
+        if len(input_json["variability-rules"]) != 0:
+            for rule in input_json["variability-rules"]:
+                new_rule = VariabilityRule(currency=rule["currency"], magnitude=rule["magnitude"], duration=rule["duration"])
+                self.variability_rules.append(new_rule)
+
     def read(self, fname):
         with open(fname, "r") as TEMPREAD:
             input_json = json.load(TEMPREAD)
@@ -53,8 +71,19 @@ class AlertRules(BaseModel):
                 new_rule = VariabilityRule(currency=rule["currency"], magnitude=rule["magnitude"], duration=rule["duration"])
                 self.variability_rules.append(new_rule)
 
+    def range_rules_to_sql(self):
+        sql_where = "\n OR ".join([rule.to_sql() for rule in self.range_rules])
+        return f"""
+SELECT
+    symbol,
+    name,
+    price
+FROM quote_latest WHERE {sql_where}
+        """
+
 
 if __name__ == "__main__":
-    ar = AlertRules()
-    ar.read("alerts_sample.json")
+    ar = AlertRules("alerts_sample.json")
+    # ar.read("alerts_sample.json")
     print(ar)
+    print(ar.range_rules_to_sql())

@@ -10,7 +10,7 @@ import sys
 from datetime import datetime, timezone
 
 # from . import coinmarketcap as ccap, sqlite as sql
-from cryptomonere import coinmarketcap as ccap, sqlite as sql
+from cryptomonere import coinmarketcap as ccap
 from cryptomonere.alerts_json import AlertRules
 from cryptomonere.SqlHandler import SqlHandler
 
@@ -101,32 +101,21 @@ def fetch_map(args: argparse.Namespace):
     data = ccap.fetch_api_json(ccap.map_url, f"{config['data_dir']}/map.json")
     if args.no_upload:
         return 0
-    recreate_cryptocurrency_map = """
-    Drop table if exists cryptocurrency_map;
-    Create table cryptocurrency_map (
-    id int unique,
-    currency_rank int,
-    name varchar(50),
-    symbol varchar(10),
-    slug varchar(50),
-    is_active tinyint,
-    status tinyint,
-    first_historical_data datetime,
-    last_historical_data datetime,
-    platform_id int,
-    platform_name varchar(50),
-    platform_symbol varchar(10),
-    platform_slug varchar(50)
-    );
-    """
-    logger.debug(recreate_cryptocurrency_map)
-    sql.cx.executescript(recreate_cryptocurrency_map)
+    SQL = SqlHandler(config)
+    SQL.sql_file("recreate_cryptocurrency_map.sql")
+
+    inserts = []
     for row in data["data"]:
         platform_query = "NULL, NULL, NULL, NULL"
         if row["platform"] is not None:
             platform_query = f"{row['platform']['id']}, \"{row['platform']['name']}\", \"{row['platform']['symbol']}\", \"{row['platform']['slug']}\""
-
-        insert_string = f"""
+        inserts.append(
+            f"""({row['id']}, {row['rank']}, \"{row['name'].strip("\"")}\", \"{row['symbol']}\", \"{row['slug']}\", {row['is_active']}, {row['status']}, \"{row['first_historical_data']}\", \"{row['last_historical_data']}\", {platform_query})""".replace(
+                "None", "NULL"
+            )
+        )
+        SQL.bulk_insert(
+            """
 insert into cryptocurrency_map (
     id,
     currency_rank,
@@ -141,15 +130,10 @@ insert into cryptocurrency_map (
     platform_name,
     platform_symbol,
     platform_slug
-) VALUES ({row['id']}, {row['rank']}, \"{row['name'].strip("\"")}\", \"{row['symbol']}\", \"{row['slug']}\", {row['is_active']}, {row['status']}, \"{row['first_historical_data']}\", \"{row['last_historical_data']}\", {platform_query});
-        """.replace(
-            "None", "NULL"
+) VALUES """,
+            inserts,
         )
-        logger.debug(insert_string)
-        sql.cx.execute(insert_string)
-        sql.cx.commit()
-
-        sql.sql_file("dedupe_cryptocurrency_map.sql")
+        SQL.sql_file("dedupe_cryptocurrency_map.sql")
 
 
 def query_map(args: argparse.Namespace):

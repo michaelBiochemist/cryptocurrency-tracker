@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import logging
+import pathlib
 import sqlite3 as sqlite
 from itertools import chain
 from typing import List
@@ -71,7 +72,7 @@ class SqlHandler:
 
     def sql_file(self, filename, row_factory=None):
         self.cx.row_factory = row_factory
-        with open("sql/" + filename) as SQLFILE:
+        with open(pathlib.Path(__file__).parent.joinpath(f"sql/{filename}")) as SQLFILE:
             query = SQLFILE.read()
         logger.debug(query)
         temp = self.cx.executescript(query)

@@ -79,21 +79,21 @@ def load_historic(args: argparse.Namespace):
     with open(fname) as R:
         rawfile = R.readlines()
 
-    inserts = ""
+    inserts = []
     for line in rawfile[1:]:
         liney = line.strip().split(",")
         liney_remainder = ",".join(liney[2:])
-        inserts += f'("{symbol}","{liney[0]}","{liney[1]}",{liney_remainder}),'
+        inserts.append(f'("{symbol}","{liney[0]}","{liney[1]}",{liney_remainder})')
 
-    sql.cx.execute(
+    SQL = SqlHandler(config)
+    SQL.bulk_insert(
         """
     Insert into historical
     (Symbol, StartDate, EndDate, Open, High, Low, Close, Volume, Market_Cap)
     Values
-    """
-        + inserts[:-1]
+    """,
+        inserts,
     )
-    sql.cx.commit()
     logger.info("file uploaded successfully")
 
 

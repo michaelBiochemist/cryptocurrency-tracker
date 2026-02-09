@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "cryptomonere"
-version = '0.0.0'
+version = '0.0.1'
 dependencies = [
     "pydantic",
     "requests",

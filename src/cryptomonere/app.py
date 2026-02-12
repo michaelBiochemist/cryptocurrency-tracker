@@ -69,6 +69,9 @@ def parse_args(args_raw):
     parser_search = subparsers.add_parser("alert", help="Check alerts")
     parser_search.set_defaults(func=alert)
 
+    parser_report = subparsers.add_parser("report", help="Generate Reports")
+    parser_report.set_defaults(func=report_quote_latest)
+
     args = parser.parse_args(args_raw)
     return args
 
@@ -248,11 +251,31 @@ def fetch_and_insert_latest_quotes(args: argparse.Namespace):
     if not args.no_update_alert:
         alert(args)
 
+    report_quote_latest(args)
+
+
+def report_quote_latest(args: argparse.Namespace):
+    SQL = SqlHandler(config)
+    header_space = {"Time": 16, "SYMB": 7, "Name": 20, "price": 8, "%24h": 9, "%7d": 7, "%30d": 7, "%60d": 7, "%90d": 7, "%V24h": 10}
+    header = ""
+    for key in header_space.keys():
+        header += key.ljust(header_space[key])
+    print(header)
+    SQL.sql_file(
+        "quote_latest_report.sql",
+        row_factory=lambda Cursor, Row: print(
+            f"{Row[0][:16]} {Row[1]:6s}{Row[2]:16s}{Row[3]:>10.4f} {Row[4]:>5.2f} {Row[5]:7.2f} {Row[6]:7.2f} {Row[7]:7.2f} {Row[8]:7.2f} {Row[9] * 100:6.1f}"
+        ),
+    )
+
 
 def alert(args: argparse.Namespace):
-    ar = AlertRules(pathlib.Path(args.config_directory).expanduser().joinpath("alert_rules.json"))
+    config_path = pathlib.Path(args.config_directory).expanduser()
+    ar = AlertRules(config_path.joinpath("alert_rules.json"))
     SQL = SqlHandler(config)
-    SQL.sql(ar.range_rules_to_sql(), row_factory=lambda Cursor, Row: print(f"{Row[0]} {Row[2]} {Row[1]}"))
+    lines = SQL.sql(ar.range_rules_to_sql(), row_factory=lambda Cursor, Row: f"{Row[0]} {Row[2]} {Row[1]}")
+    with open(config_path.joinpath("alerts"), "w") as WRITE:
+        WRITE.write("\n".join(lines))
 
 
 def init(args: argparse.Namespace):

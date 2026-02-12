@@ -75,9 +75,10 @@ class SqlHandler:
         with open(pathlib.Path(__file__).parent.joinpath(f"sql/{filename}")) as SQLFILE:
             query = SQLFILE.read()
         logger.debug(query)
-        temp = self.cx.executescript(query)
         if row_factory is not None:
+            temp = self.cx.execute(query)
             return temp.fetchall()
+        self.cx.executescript(query)
 
     def sql(self, query, row_factory=None, is_update=False):
         self.cx.row_factory = row_factory

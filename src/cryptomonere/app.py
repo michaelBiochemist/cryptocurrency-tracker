@@ -4,14 +4,13 @@ import argparse
 import json
 import logging
 import logging.config
-import pathlib
-import shutil
 import sys
 from datetime import datetime, timezone
 
 # from . import coinmarketcap as ccap, sqlite as sql
 from cryptomonere import coinmarketcap as ccap
 from cryptomonere.alerts_json import AlertRules
+from cryptomonere.config import get_config
 from cryptomonere.SqlHandler import SqlHandler
 
 logger = logging.getLogger("monere")
@@ -24,9 +23,6 @@ Log levels:
 """
 
 
-config_directory = f"{pathlib.Path.home()}/.config/cryptotracker"
-
-
 def parse_args(args_raw):
     parser = argparse.ArgumentParser(description="Cryptocurrency Price Tracker")
     parser.add_argument(
@@ -34,12 +30,6 @@ def parse_args(args_raw):
         "--log-level",
         help="set log level. Options are ERROR, WARNING, INFO, and DEBUG",
         default="INFO",
-    )
-    parser.add_argument(
-        "-c",
-        "--config-directory",
-        default=f"{pathlib.Path.home()}/.config/cryptotracker",
-        help=f"Use a custom directory for relevant config files and api keys. Default is:\n{pathlib.Path.home()}/.config/cryptotracker",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -59,7 +49,7 @@ def parse_args(args_raw):
     parser_get.add_argument("-n", "--no-update-alert", default=False)
 
     parser_map = subparsers.add_parser("map", help="Get mapping of CoinmarketCap Ids to All listed cryptocurrencies")
-    parser_map.set_defaults(func=fetch_map)
+    parser_map.set_defaults(func=fetch_map_main)
     parser_map.add_argument("-N", "--no-upload", default=False)
 
     parser_search = subparsers.add_parser("search", help="Query Cryptocurrency Mappings")
@@ -88,7 +78,7 @@ def load_historic(args: argparse.Namespace):
         liney_remainder = ",".join(liney[2:])
         inserts.append(f'("{symbol}","{liney[0]}","{liney[1]}",{liney_remainder})')
 
-    SQL = SqlHandler(config)
+    SQL = SqlHandler()
     SQL.bulk_insert(
         """
     Insert into historical
@@ -100,11 +90,18 @@ def load_historic(args: argparse.Namespace):
     logger.info("file uploaded successfully")
 
 
-def fetch_map(args: argparse.Namespace):
-    data = ccap.fetch_api_json(ccap.map_url, f"{config['data_dir']}/map.json")
-    if args.no_upload:
+def fetch_map_main(args: argparse.Namespace):
+    fetch_map(args.no_upload)
+
+
+def fetch_map(no_upload=False):
+    config = get_config()
+    # data = ccap.fetch_api_json(ccap.map_url, f"{config.data_dir}/map.json")
+    with open(config.data_dir.joinpath("map.json")) as readJson:
+        data = json.load(readJson)
+    if no_upload:
         return 0
-    SQL = SqlHandler(config)
+    SQL = SqlHandler()
     SQL.sql_file("recreate_cryptocurrency_map.sql")
 
     inserts = []
@@ -117,8 +114,8 @@ def fetch_map(args: argparse.Namespace):
                 "None", "NULL"
             )
         )
-        SQL.bulk_insert(
-            """
+    SQL.bulk_insert(
+        """
 insert into cryptocurrency_map (
     id,
     currency_rank,
@@ -134,16 +131,13 @@ insert into cryptocurrency_map (
     platform_symbol,
     platform_slug
 ) VALUES """,
-            inserts,
-        )
-        SQL.sql_file("dedupe_cryptocurrency_map.sql")
+        inserts,
+    )
+    SQL.sql_file("dedupe_currency_map.sql")
 
 
 def query_map(args: argparse.Namespace):
-    SQL = SqlHandler(config)
-    if "cryptocurrency_map" not in SQL.table_list:
-        logger.info("Table cryptocurrency_map does not exist. This data will take a minute to fetch and upload...")
-        fetch_map(args)
+    SQL = SqlHandler()
     headers = ["Cap_Id", "Symbol", "Name", "slug", "rank"]
     print(f"{headers[0].ljust(6)} {headers[4].ljust(6)}  {headers[1].ljust(10)}{headers[2].ljust(30)};{headers[3].ljust(30)}")
     SQL.sql(
@@ -159,13 +153,14 @@ def query_map(args: argparse.Namespace):
 
 def fetch_and_insert_latest_quotes(args: argparse.Namespace):
     # Set parameters in decreasing order of specificity, from coinmarketcap_id, to slug, to symbol
-    if "symbols" not in config.keys():
+    config = get_config()
+    if len(config.symbols) == 0:
         logging.warn(
             "There is no list of cryptocurrency symbols in your config file, and thus nothing to query. Please update your config file if you want this command to work."
         )
         return 1
-    SQL = SqlHandler(config)
-    symbol_list = '","'.join(config["symbols"])
+    SQL = SqlHandler()
+    symbol_list = '","'.join(config.symbols)
     id_list = SQL.listQuery(
         f"""
     Select Id from currency
@@ -175,7 +170,7 @@ def fetch_and_insert_latest_quotes(args: argparse.Namespace):
 
     parameters = {"id": ",".join([str(cmc_id) for cmc_id in id_list])}
     timestamp = datetime.now(timezone.utc).isoformat()
-    data = ccap.fetch_api_json(ccap.quotes_url, f"{config['data_dir']}/quotes_latest.json", parameters=parameters)
+    data = ccap.fetch_api_json(ccap.quotes_url, f"{config.data_dir}/quotes_latest.json", parameters=parameters)
     if args.no_upload:
         return 0
     insert_string = """
@@ -255,7 +250,7 @@ def fetch_and_insert_latest_quotes(args: argparse.Namespace):
 
 
 def report_quote_latest(args: argparse.Namespace):
-    SQL = SqlHandler(config)
+    SQL = SqlHandler()
     header_space = {"Time": 16, "SYMB": 7, "Name": 20, "price": 8, "%24h": 9, "%7d": 7, "%30d": 7, "%60d": 7, "%90d": 7, "%V24h": 10}
     header = ""
     for key in header_space.keys():
@@ -270,53 +265,20 @@ def report_quote_latest(args: argparse.Namespace):
 
 
 def alert(args: argparse.Namespace):
-    config_path = pathlib.Path(args.config_directory).expanduser()
-    ar = AlertRules(config_path.joinpath("alert_rules.json"))
-    SQL = SqlHandler(config)
+    config = get_config()
+    ar = AlertRules(config.config_dir.joinpath("alert_rules.json"))
+    SQL = SqlHandler()
     lines = SQL.sql(ar.range_rules_to_sql(), row_factory=lambda Cursor, Row: f"{Row[0]} {Row[2]} {Row[1]}")
-    with open(config_path.joinpath("alerts"), "w") as WRITE:
+    with open(config.config_dir.joinpath("alerts"), "w") as WRITE:
         WRITE.write("\n".join(lines))
-
-
-def init(args: argparse.Namespace):
-    global config
-    path = pathlib.Path(args.config_directory).expanduser()
-    if not path.exists():
-        logger.info(f"Path {path}. does not currently exist. Creating it...")
-        try:
-            path.mkdir(parents=True)
-        except Exception as e:
-            logger.error(f"Path {path} cannot be created due to an exception:\n{e}\nPlease run again with a usable path (or allow the default to be created)")
-            exit()
-
-    config_path = path.joinpath("config.json")
-    if not config_path.exists():
-        logger.info("Config file does not exist. Creating default config file.")
-        shutil.copy(pathlib.Path(__file__).parent.joinpath("config_default.json"), config_path)
-        shutil.copy(pathlib.Path(__file__).parent.joinpath("alerts_sample.json"), config_path.parent.joinpath("alert_rules.json"))
-        logger.info(
-            f"""Config file has been created at {config_path}.\n
-        Please open your config file and update your api key.
-        Please Also update your alert_rules.json file to get correct alerts"""
-        )
-        exit()
-    with open(config_path) as R:
-        config = json.load(R)
-    config["data_dir"] = pathlib.Path(config["data_dir"]).expanduser()
-    if not config["data_dir"].exists():
-        config["data_dir"].mkdir(parents=True)
-    ccap.init(config)
-    SQL = SqlHandler(config)
-    if "currency" not in SQL.table_list:
-        logger.info("currency table (table listing all supported cryptocurrencies) does not exist. Creating it... (this may take a minute)")
-        fetch_map(args)
 
 
 def main(args_raw):
     # logging.config.dictConfig(config=logging_config)
     args = parse_args(args_raw)
     logging.basicConfig(level=args.log_level)
-    init(args)
+    SQL = SqlHandler()
+    SQL.init_db()
     args.func(args)
 
 
@@ -325,4 +287,5 @@ def run():
 
 
 if __name__ == "__main__":
+    print(sys.argv[1:])
     run()

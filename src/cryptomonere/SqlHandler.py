@@ -6,6 +6,9 @@ import sqlite3 as sqlite
 from itertools import chain
 from typing import List
 
+from cryptomonere import app
+from cryptomonere.config import get_config
+
 logger = logging.getLogger(__name__)
 create_tables = """
 CREATE TABLE history
@@ -89,10 +92,16 @@ class SqlHandler:
         else:
             return temp.fetchall()
 
-    def __init__(self, config):
-        self.cx = sqlite.connect(f"{config['data_dir']}/crypto.db")
-        self.table_list = self.listQuery("select name from sqlite_master where type='table'")
+    def init_db(self):
         if len(self.table_list) == 0:
             logger.warning("Database is empty and has no schema. Creating tables...")
             self.cx.executescript(create_tables)
             self.table_list = self.listQuery("select name from sqlite_master where type='table'")
+        if "currency" not in self.table_list:
+            logger.info("currency table (table listing all supported cryptocurrencies) does not exist. Creating it... (this may take a minute)")
+            app.fetch_map()  # Calling "monere map"
+
+    def __init__(self):
+        config = get_config()
+        self.cx = sqlite.connect(f"{config.data_dir}/crypto.db")
+        self.table_list = self.listQuery("select name from sqlite_master where type='table'")

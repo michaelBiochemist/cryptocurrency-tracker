@@ -1,5 +1,5 @@
 {
-    "data_dir": "~/.local/share/cryptotracker",
+    "data_dir": "~/.local/share/cryptomonere",
     "api_keys": {"coinmarketcap": "Enter your coinmarketcap api key here"},
     "symbols": [
 	    "BTC",

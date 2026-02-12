@@ -1,6 +1,6 @@
-drop table if exists currencies;
+drop table if exists currency;
 
-create table currencies as
+create table currency as
 select
     id,
     currency_rank,
@@ -26,4 +26,4 @@ from
 where row_rank = 1
 order by currency_rank asc;
 
-create index currency_symbol on currencies(symbol);
+create index currency_symbol on currency(symbol);

@@ -6,7 +6,6 @@ import sqlite3 as sqlite
 from itertools import chain
 from typing import List
 
-from cryptomonere import app
 from cryptomonere.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -65,6 +64,12 @@ class SqlHandler:
         a = self.cx.execute(query).fetchall()
         return list(chain(*a))
 
+    def sql_df(self, query):
+        import polars
+
+        self.cx.row_factory = None
+        return polars.read_database(query, self.cx)
+
     def bulk_insert(self, insert_into, values):
         if logger.getEffectiveLevel() == logging.DEBUG:
             for value in values:
@@ -91,15 +96,6 @@ class SqlHandler:
             self.cx.commit()
         else:
             return temp.fetchall()
-
-    def init_db(self):
-        if len(self.table_list) == 0:
-            logger.warning("Database is empty and has no schema. Creating tables...")
-            self.cx.executescript(create_tables)
-            self.table_list = self.listQuery("select name from sqlite_master where type='table'")
-        if "currency" not in self.table_list:
-            logger.info("currency table (table listing all supported cryptocurrencies) does not exist. Creating it... (this may take a minute)")
-            app.fetch_map()  # Calling "monere map"
 
     def __init__(self):
         config = get_config()

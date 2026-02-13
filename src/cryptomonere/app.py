@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import functools
 import json
 import logging
 import logging.config
@@ -59,11 +60,41 @@ def parse_args(args_raw):
     parser_search = subparsers.add_parser("alert", help="Check alerts")
     parser_search.set_defaults(func=alert)
 
-    parser_report = subparsers.add_parser("report", help="Generate Reports")
+    parser_report = subparsers.add_parser("report", help="Generate (text) Reports")
     parser_report.set_defaults(func=report_quote_latest)
+
+    parser_graph = subparsers.add_parser("graph", help="Generate (graphical) Reports")
+    subparsers_graph = parser_graph.add_subparsers(dest="Subcommand", required=True)
+    parser_graph_price_history = subparsers_graph.add_parser("price_full", help="Generate graph of complete price history for a specific cryptocurrency.")
+    parser_graph_price_history.set_defaults(func=graph_price_history_wrapper)
+    parser_graph_price_history.add_argument(
+        "symbol",
+        help='Cryptocurrency ticker symbol (e.g. "BTC" for Bitcoin; NOT case-sensitive)',
+    )
 
     args = parser.parse_args(args_raw)
     return args
+
+
+def depends_graph(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            from cryptomonere import graph  # lazy import
+
+        except ImportError:
+            logger.error(
+                """
+Graph functionality requires optional dependencies.\n
+Install with:\n
+    pip install cryptomonere[graph]\n
+or manually install matplotlib and polars."""
+            )
+            sys.exit(1)
+
+        return func(graph, *args, **kwargs)
+
+    return wrapper
 
 
 def load_historic(args: argparse.Namespace):
@@ -273,12 +304,27 @@ def alert(args: argparse.Namespace):
         WRITE.write("\n".join(lines))
 
 
+@depends_graph
+def graph_price_history_wrapper(graph, args: argparse.Namespace):
+    graph.graph_price_history(args.symbol.upper())
+
+
+def init_db():
+    SQL = SqlHandler()
+    if len(SQL.table_list) == 0:
+        logger.warning("Database is empty and has no schema. Creating tables...")
+        SQL.cx.executescript(SQL.create_tables)
+        SQL.table_list = SQL.listQuery("select name from sqlite_master where type='table'")
+    if "currency" not in SQL.table_list:
+        logger.info("currency table (table listing all supported cryptocurrencies) does not exist. Creating it... (this may take a minute)")
+        fetch_map()  # Calling "monere map"
+
+
 def main(args_raw):
     # logging.config.dictConfig(config=logging_config)
     args = parse_args(args_raw)
     logging.basicConfig(level=args.log_level)
-    SQL = SqlHandler()
-    SQL.init_db()
+    init_db()
     args.func(args)
 
 

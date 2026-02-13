@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "cryptomonere"
-version = '0.0.1'
+version = '0.0.2'
 dependencies = [
     "pydantic",
     "requests",
@@ -27,8 +27,8 @@ monere = "cryptomonere.app:run"
     "pre-commit",
     "twine",
     ]
-    reports = ["matplotlib",
-    "pandas"
+    graph = ["matplotlib",
+    "polars"
     ]
 [tool.black]
 line-length = 160

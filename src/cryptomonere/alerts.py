@@ -1,11 +1,15 @@
 #!/usr/bin env python
 import json
-from datetime import timedelta
+import logging
 from typing import List, Optional
 
 from pydantic import BaseModel
 
+from cryptomonere.SqlHandler import SqlHandler
+
 # from functools import reduce
+
+logger = logging.getLogger(__name__)
 
 
 class RangeRule(BaseModel):
@@ -23,14 +27,16 @@ class RangeRule(BaseModel):
 
 
 class VariabilityRule(BaseModel):
-    currency: str
-    magnitude: float
+    currency: Optional[str] = "NULL"
+    percent_change: int
     duration: str
-    duration_parsed: Optional[timedelta] = None
+    duration_parsed: Optional[float] = None
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.duration_parsed = self.parse_duration()
+        if self.currency == "":
+            self.currency = "NULL"
 
     def parse_duration(self):
         a = self.duration.lower().strip("s")
@@ -38,8 +44,15 @@ class VariabilityRule(BaseModel):
         for dkey in delta.keys():
             b = a.split(dkey)
             if len(b) == 2:
-                return timedelta(days=int(b[0]) * delta[dkey])
+                # return timedelta(days=int(b[0]) * delta[dkey])
+                return float(b[0]) * delta[dkey]
         # handle error
+
+    def to_sql_values(self):
+        currency = self.currency
+        if self.currency != "NULL":
+            currency = f'"{currency}"'
+        return f"({currency}, {self.percent_change}, {self.duration_parsed})"
 
 
 class AlertRules(BaseModel):
@@ -48,16 +61,7 @@ class AlertRules(BaseModel):
 
     def __init__(self, fname):
         super().__init__()
-        with open(fname, "r") as TEMPREAD:
-            input_json = json.load(TEMPREAD)
-        if len(input_json["range-rules"]) != 0:
-            for rule in input_json["range-rules"]:
-                new_rule = RangeRule(currency=rule["currency"], low=rule["low"], high=rule["high"])
-                self.range_rules.append(new_rule)
-        if len(input_json["variability-rules"]) != 0:
-            for rule in input_json["variability-rules"]:
-                new_rule = VariabilityRule(currency=rule["currency"], magnitude=rule["magnitude"], duration=rule["duration"])
-                self.variability_rules.append(new_rule)
+        self.read(fname)
 
     def read(self, fname):
         with open(fname, "r") as TEMPREAD:
@@ -68,7 +72,10 @@ class AlertRules(BaseModel):
                 self.range_rules.append(new_rule)
         if len(input_json["variability-rules"]) != 0:
             for rule in input_json["variability-rules"]:
-                new_rule = VariabilityRule(currency=rule["currency"], magnitude=rule["magnitude"], duration=rule["duration"])
+                if "currency" in rule.keys():
+                    new_rule = VariabilityRule(currency=rule["currency"], percent_change=rule["percent_change"], duration=rule["duration"])
+                else:
+                    new_rule = VariabilityRule(percent_change=rule["percent_change"], duration=rule["duration"])
                 self.variability_rules.append(new_rule)
 
     def range_rules_to_sql(self):
@@ -80,6 +87,21 @@ SELECT
     price
 FROM quote_latest WHERE {sql_where}
         """
+
+    def variability_rules_to_table(self):
+        SQL = SqlHandler()
+        SQL.sql_file("table_alert_variability_rule.sql")
+        if len(self.variability_rules) == 0:
+            logging.debug("The number of parsed varibility rules is 0")
+            return 0
+
+        SQL.bulk_insert(
+            """
+insert into alert_variability_rule
+(symbol, percent_change, duration) VALUES
+        """,
+            [x.to_sql_values() for x in self.variability_rules],
+        )
 
 
 if __name__ == "__main__":

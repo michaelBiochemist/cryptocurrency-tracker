@@ -4,7 +4,8 @@
         {"currency": "MINA", "low":0.0001, "high": 1.0}
     ],
     "variability-rules": [
-        {"currency":"All", "magnitude": 0.6, "duration": "1 week"},
-        {"currency":"All", "magnitude": 0.3, "duration": "1 week"}
+        {"percent_change": 60, "duration": "1 week"},
+        {"percent_change": -30, "duration": "1 week"},
+        {"currency":"XMR", "percent_change": -15, "duration": "1 week"}
     ]
 }

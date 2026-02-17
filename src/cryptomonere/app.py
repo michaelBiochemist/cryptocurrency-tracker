@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 # from . import coinmarketcap as ccap, sqlite as sql
 from cryptomonere import coinmarketcap as ccap, report
-from cryptomonere.alerts_json import AlertRules
+from cryptomonere.alerts import AlertRules
 from cryptomonere.config import get_config
 from cryptomonere.SqlHandler import SqlHandler
 
@@ -312,9 +312,14 @@ def alert(args: argparse.Namespace):
     config = get_config()
     ar = AlertRules(config.config_dir.joinpath("alert_rules.json"))
     SQL = SqlHandler()
-    lines = SQL.sql(ar.range_rules_to_sql(), row_factory=lambda Cursor, Row: f"{Row[0]} {Row[2]} {Row[1]}")
+    lines = SQL.sql(ar.range_rules_to_sql(), row_factory=lambda Cursor, Row: f"{Row[0]:6s} {Row[2]:10.3f} {Row[1]}\n")
     with open(config.config_dir.joinpath("alerts"), "w") as WRITE:
-        WRITE.write("\n".join(lines))
+        WRITE.write("".join(lines))
+    ar.variability_rules_to_table()
+
+    lines = SQL.sql_file("variability_alerts.sql", row_factory=lambda Cursor, Row: f"{Row[0]:10s}{Row[1][:16]:20s}{Row[2][:10]:14s}{Row[3]:>6.2f}%\n")
+    with open(config.config_dir.joinpath("alerts"), "a") as APPEND:
+        APPEND.write("".join(lines))
 
 
 @depends_graph

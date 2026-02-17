@@ -9,7 +9,7 @@ import sys
 from datetime import datetime, timezone
 
 # from . import coinmarketcap as ccap, sqlite as sql
-from cryptomonere import coinmarketcap as ccap
+from cryptomonere import coinmarketcap as ccap, report
 from cryptomonere.alerts_json import AlertRules
 from cryptomonere.config import get_config
 from cryptomonere.SqlHandler import SqlHandler
@@ -61,7 +61,25 @@ def parse_args(args_raw):
     parser_search.set_defaults(func=alert)
 
     parser_report = subparsers.add_parser("report", help="Generate (text) Reports")
-    parser_report.set_defaults(func=report_quote_latest)
+    subparsers_report = parser_report.add_subparsers(dest="report_type", required=True)
+    parser_report_quote_latest = subparsers_report.add_parser("latest", help="View latest quotes")
+    parser_report_quote_latest.set_defaults(func=report.quote_latest)
+
+    parser_report_last_at = subparsers_report.add_parser("last_at", help="View most recent date a given currency was at a given price")
+    parser_report_last_at.set_defaults(func=report_last_at_wrapper)
+    parser_report_last_at.add_argument(
+        "symbol",
+        help='Cryptocurrency ticker symbol (e.g. "BTC" for Bitcoin; NOT case-sensitive)',
+    )
+    parser_report_last_at.add_argument(
+        "price",
+        help="The price you are are cheking for.",
+    )
+
+    parser_report_double_half = subparsers_report.add_parser(
+        "doubles_and_halves", help="View latest quotes - and last time they were at double/half their current price"
+    )
+    parser_report_double_half.set_defaults(func=report.all_last_at)
 
     parser_graph = subparsers.add_parser("graph", help="Generate (graphical) Reports")
     subparsers_graph = parser_graph.add_subparsers(dest="Subcommand", required=True)
@@ -70,6 +88,16 @@ def parse_args(args_raw):
     parser_graph_price_history.add_argument(
         "symbol",
         help='Cryptocurrency ticker symbol (e.g. "BTC" for Bitcoin; NOT case-sensitive)',
+    )
+    parser_graph_history_comparison = subparsers_graph.add_parser("comparison", help="Generate graph of comparing prices of two cryptocurrencies.")
+    parser_graph_history_comparison.set_defaults(func=graph_price_comparison_wrapper)
+    parser_graph_history_comparison.add_argument(
+        "symbol",
+        help='Cryptocurrency ticker symbol (e.g. "BTC" for Bitcoin; NOT case-sensitive)',
+    )
+    parser_graph_history_comparison.add_argument(
+        "symbol2",
+        help="Second Cryptocurrency ticker symbol ",
     )
 
     args = parser.parse_args(args_raw)
@@ -277,22 +305,7 @@ def fetch_and_insert_latest_quotes(args: argparse.Namespace):
     if not args.no_update_alert:
         alert(args)
 
-    report_quote_latest(args)
-
-
-def report_quote_latest(args: argparse.Namespace):
-    SQL = SqlHandler()
-    header_space = {"Time": 16, "SYMB": 7, "Name": 20, "price": 8, "%24h": 9, "%7d": 7, "%30d": 7, "%60d": 7, "%90d": 7, "%V24h": 10}
-    header = ""
-    for key in header_space.keys():
-        header += key.ljust(header_space[key])
-    print(header)
-    SQL.sql_file(
-        "quote_latest_report.sql",
-        row_factory=lambda Cursor, Row: print(
-            f"{Row[0][:16]} {Row[1]:6s}{Row[2]:16s}{Row[3]:>10.4f} {Row[4]:>5.2f} {Row[5]:7.2f} {Row[6]:7.2f} {Row[7]:7.2f} {Row[8]:7.2f} {Row[9] * 100:6.1f}"
-        ),
-    )
+    report.quote_latest(args)
 
 
 def alert(args: argparse.Namespace):
@@ -307,6 +320,15 @@ def alert(args: argparse.Namespace):
 @depends_graph
 def graph_price_history_wrapper(graph, args: argparse.Namespace):
     graph.graph_price_history(args.symbol.upper())
+
+
+@depends_graph
+def graph_price_comparison_wrapper(graph, args: argparse.Namespace):
+    graph.graph_price_comparison(args.symbol.upper(), args.symbol2.upper())
+
+
+def report_last_at_wrapper(args: argparse.Namespace):
+    report.last_at(args.symbol, args.price)
 
 
 def init_db():
